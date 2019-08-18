@@ -20,8 +20,8 @@ MASS_POS = [MASS] + POS
 MECHANICS = POS + VEL
 STATE = [MASS] + MECHANICS
 
-n_features = len(STATE)
-BODY_SHAPE = (n_features,)
+N_FEATURES = len(STATE)
+BODY_SHAPE = (N_FEATURES,)
 
 
 def generate_data_with_simulator(n_objects, orbit, time_steps, dt):
@@ -35,7 +35,7 @@ def generate_data_with_simulator(n_objects, orbit, time_steps, dt):
 
 
 def get_init_state(time_steps, n_body, orbit):
-    data = np.zeros((time_steps, n_body, n_features), dtype=float)
+    data = np.zeros((time_steps, n_body, N_FEATURES), dtype=float)
 
     if orbit:
         data[0, 0] = get_central_mass()
@@ -96,7 +96,7 @@ def get_gravitational_force(receiver, sender):
 
 
 def calculate_next_state(current_state, n_bodies, dt):
-    next_state = np.zeros((n_bodies, n_features), dtype=float)
+    next_state = np.zeros((n_bodies, N_FEATURES), dtype=float)
 
     forces_matrix = np.zeros((n_bodies, n_bodies, 2), dtype=float)
     forces_sum = np.zeros((n_bodies, 2), dtype=float)
@@ -162,3 +162,7 @@ def make_video(data, filename):
             writer.grab_frame()
 
     print(f'Video done.')
+
+if __name__ == '__main__':
+    data = generate_data_with_simulator(n_objects=5, orbit=True, time_steps=30 * 2, dt=0.001)
+    make_video(data, "test.mp4")
