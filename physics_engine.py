@@ -23,20 +23,24 @@ STATE = [MASS] + MECHANICS
 N_FEATURES = len(STATE)
 BODY_SHAPE = (N_FEATURES,)
 
+COLOR_LIST = ['r','b','g','k','y','m','c']
 
 def generate_data_with_simulator(n_objects, orbit, time_steps, dt):
     print(f'Generating data with {time_steps} time steps for {n_objects} objects.')
-    data = get_init_state(time_steps, n_objects, orbit)
+
+    data = np.zeros((time_steps, n_objects, N_FEATURES), dtype=float)
+    data = get_init_state(data, n_objects, orbit)
 
     for ii in range(1, time_steps):
         data[ii] = calculate_next_state(data[ii - 1], n_objects, dt)
 
+    # In the paper, objects are given by columns in O.
+    data = data.transpose((0, 2, 1))
+
     return data
 
 
-def get_init_state(time_steps, n_body, orbit):
-    data = np.zeros((time_steps, n_body, N_FEATURES), dtype=float)
-
+def get_init_state(data, n_body, orbit):
     if orbit:
         data[0, 0] = get_central_mass()
 
@@ -125,10 +129,10 @@ def make_video(data, filename):
 
     print(f'Generating videos for data with shape {data.shape}.')
 
-    x_min = np.min(data[:, :, POS_X])
-    x_max = np.max(data[:, :, POS_X])
-    y_min = np.min(data[:, :, POS_Y])
-    y_max = np.max(data[:, :, POS_Y])
+    x_min = np.min(data[:, POS_X, :])
+    x_max = np.max(data[:, POS_X, :])
+    y_min = np.min(data[:, POS_Y, :])
+    y_max = np.max(data[:, POS_Y, :])
     x_delta = x_max - x_min
     x_min -= x_delta * 0.05
     x_max += x_delta * 0.05
@@ -141,7 +145,6 @@ def make_video(data, filename):
     metadata = dict(title='Movie Test', artist='Matplotlib', comment='Movie support!')
     writer = FFMpegWriter(fps=30, metadata=metadata)
 
-    color = ['ro','bo','go','ko','yo','mo','co']
     marker_sizes = [5] + [3]*6
 
     fig = plt.figure()
@@ -154,10 +157,10 @@ def make_video(data, filename):
                 print(f'Frame {frame} ...')
 
             for body_i in range(n_bodies):
-                modifier_idx = body_i % len(color)
-                plt.plot(data[frame, body_i, POS_Y],
-                         data[frame, body_i, POS_X],
-                         color[modifier_idx],
+                modifier_idx = body_i % len(COLOR_LIST)
+                plt.plot(data[frame, POS_Y, body_i],
+                         data[frame, POS_X, body_i],
+                         COLOR_LIST[modifier_idx] + 'o',
                          markersize=marker_sizes[modifier_idx])
             writer.grab_frame()
 
