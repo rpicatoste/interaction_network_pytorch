@@ -1,54 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.autograd import Variable
-import random
 
-import numpy as np
-import matplotlib.pyplot as plt
-from IPython.display import clear_output
-
-from physics_engine import POS_X, POS_Y, STATE, VEL, POS, COLOR_LIST
-
-device = 'cpu'
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-if device == 'cuda':
-    if 'forces_first_cuda_action_done' not in locals():
-
-        try:
-            a = torch.rand((2, 3, 2)).to('cuda')
-            b = torch.rand((2, 3, 4)).to('cuda')
-            a = a.permute(0, 2, 1).bmm(b)
-        except:
-            print('Forced first action in cuda to avoid later error.')
-
-        torch.Tensor.ndim = property(lambda x: len(x.shape))  # so tensors can be plot
-        forces_first_cuda_action_done = True
-
-
-def get_batch(data, batch_size, shuffle=True):
-    if shuffle:
-        rand_idx = [random.randint(0, len(data) - 2) for _ in range(batch_size)]
-    else:
-        rand_idx = list(range(0, len(data) - 2))
-
-    label_idx = [idx + 1 for idx in rand_idx]
-
-    batch_data = data[rand_idx]
-    label_data = data[label_idx]
-
-    objects = batch_data[:, STATE, :]
-    target = label_data[:, VEL, :]
-
-    objects = Variable(torch.FloatTensor(objects))
-    target = Variable(torch.FloatTensor(target))
-
-    objects = objects.to(device)
-    target = target.to(device)
-
-    return objects, target
-
+from pytorch_commons import device
 
 # Relation-centric Nerural Network
 # This NN takes all information about relations in the graph and outputs effects of all interactions
@@ -72,12 +25,12 @@ class RelationalModel(nn.Module):
         )
 
     def forward(self, B):
-        '''
+        """
         Args:
             x: [batch_size, input_size, n_relations]
         Returns:
             [batch_size, effect_dim, n_relations]
-        '''
+        """
         batch_size, _, n_relations = B.shape
 
         # f_R es applied to each relation independently, and therefore to apply f_R it doesn't
@@ -90,6 +43,7 @@ class RelationalModel(nn.Module):
         x = x.view(batch_size, n_relations, self.D_e).permute(0, 2, 1)
 
         return x
+
 
 # Object-centric Neural Network
 # This NN takes information about all objects and effects on them, then outputs prediction of the
@@ -109,12 +63,12 @@ class ObjectModel(nn.Module):
         )
 
     def forward(self, C):
-        '''
+        """
         Args:
             C: [batch_size,  input_size = D_s + D_x + D_e, n_objects]
         Returns:
             [batch_size * n_objects, 2] speedX and speedY
-        '''
+        """
         # input_size = x.size(2)
         batch_size, _, n_objects = C.shape
 
@@ -140,7 +94,6 @@ class InteractionNetwork(nn.Module):
         self.D_p = output_dim
 
         self.N_R, self.R_r, self.R_s, self.R_a = self.generate_matrices(self.N_O)
-
 
         self.f_R = RelationalModel(input_dim=2 * self.D_s + self.D_r,
                                    effect_dim=self.D_e,
@@ -200,6 +153,8 @@ class InteractionNetwork(nn.Module):
         assert self.R_r.shape[0] == self.N_O
         assert O.shape[-1] == self.N_O
 
+        # print('O', O.shape, type(O), O.dtype)
+        # print('R_r', self.R_r.shape, type(self.R_r), self.R_r.dtype)
         O_R_r = O @ self.R_r
         O_R_s = O @ self.R_s
         B = torch.cat([O_R_r,
@@ -214,82 +169,3 @@ class InteractionNetwork(nn.Module):
         C = torch.cat([objects, effect_receivers], dim=len(objects.shape)-2)
 
         return C
-
-
-class Model:
-    def __init__(self, n_objects, state_dim, relation_dim, effect_dim, output_dim):
-        self.network = InteractionNetwork(n_objects, state_dim, relation_dim, effect_dim, output_dim)
-
-        self.losses = []
-        self.n_objects = n_objects
-        self.relation_dim = relation_dim
-
-        self.optimizer = optim.Adam(self.network.parameters())
-        self.criterion = nn.MSELoss()
-
-    def train(self, n_epoch, batches_per_epoch, data):
-        print('Training ...')
-        for epoch in range(n_epoch):
-            for _ in range(batches_per_epoch):
-                objects, target = get_batch(data=data, batch_size=1000)
-
-                predicted = self.network(objects)
-                # print('predicted', predicted.shape)
-                # print('target', target.shape)
-                loss = self.criterion(predicted, target)
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-                self.losses.append(np.sqrt(loss.item()))
-
-            if epoch % (n_epoch/20) == 0:
-                plt.figure(figsize=(10, 5))
-                plt.title('Epoch %s RMS Error %s' % (epoch, np.sqrt(np.mean(self.losses[-100:]))))
-                plt.plot(self.losses)
-                clear_output(True)
-                print(f'Done epoch {epoch}... ')
-                plt.show()
-
-
-    def test(self, test_data, dt):
-
-        objects, _ = get_batch(data=test_data, batch_size=len(test_data), shuffle=False)
-
-        n_steps = len(objects)
-        n_objects = len(objects[0, 0])
-
-        # Preallocate space for pos and velocity and get the first value.
-        pos_predictions = torch.zeros_like(objects[:, POS, :])
-        speed_predictions = torch.zeros_like(objects[:, VEL, :])
-        print(test_data.shape)
-        print(type(test_data))
-
-        prev_state = objects[0:1]
-
-        with torch.no_grad():
-            for step_i in range(n_steps):
-                # print('prev_state.shape', prev_state.shape)
-                # print('objects.shape', objects.shape)
-                speed_prediction = self.network(prev_state)
-                # print('speed_prediction.shape', speed_prediction.shape)
-                pos_prediction = prev_state[0, POS, :] + speed_prediction * dt
-
-                speed_predictions[step_i] = speed_prediction
-                pos_predictions[step_i] = pos_prediction
-
-                prev_state[0, POS, :] = pos_prediction
-                prev_state[0, VEL, :] = speed_prediction
-
-        plt.figure()
-        for object_i in range(n_objects):
-            modifier_idx = object_i % len(COLOR_LIST)
-            plt.plot(test_data[:, POS_X, object_i],
-                     test_data[:, POS_Y, object_i],
-                     COLOR_LIST[modifier_idx],
-                     label=f'real {object_i}')
-            plt.plot(pos_predictions[:, 0, object_i].cpu(),
-                     pos_predictions[:, 1, object_i].cpu(),
-                     '--' + COLOR_LIST[modifier_idx],
-                     label=f'pred {object_i}',
-                     )
-        plt.legend()

@@ -18,7 +18,9 @@ VEL = [V_X, V_Y]
 
 MASS_POS = [MASS] + POS
 MECHANICS = POS + VEL
+
 STATE = [MASS] + MECHANICS
+OUTPUT = VEL
 
 N_FEATURES = len(STATE)
 BODY_SHAPE = (N_FEATURES,)
@@ -125,7 +127,7 @@ def calculate_next_state(current_state, n_bodies, dt):
 
 def make_video(data, filename):
     time_steps = len(data)
-    n_bodies = len(data[0])
+    n_bodies = data.shape[2]
 
     print(f'Generating videos for data with shape {data.shape}.')
 
