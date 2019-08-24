@@ -69,7 +69,7 @@ class ModelTrainer:
         prev_state = states[0:1]
 
         with torch.no_grad():
-            for step_i in range(n_steps-1):
+            for step_i in range(n_steps-2):
                 # print('prev_state.shape', prev_state.shape)
                 # print('objects.shape', objects.shape)
                 speed_hat = self.network(prev_state)

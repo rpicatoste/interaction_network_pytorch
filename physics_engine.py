@@ -28,7 +28,7 @@ BODY_SHAPE = (N_FEATURES,)
 COLOR_LIST = ['r','b','g','k','y','m','c']
 
 def generate_data_with_simulator(n_objects, orbit, time_steps, dt):
-    print(f'Generating data with {time_steps} time steps for {n_objects} objects.')
+    print(f'Generating data with {time_steps} time steps for {n_objects} objects (orbit: {orbit}).')
 
     data = np.zeros((time_steps, n_objects, N_FEATURES), dtype=float)
     data = get_init_state(data, n_objects, orbit)

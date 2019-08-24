@@ -33,7 +33,7 @@ class RelationalModel(nn.Module):
         """
         batch_size, _, n_relations = B.shape
 
-        # f_R es applied to each relation independently, and therefore to apply f_R it doesn't
+        # f_R is applied to each relation independently, and therefore to apply f_R it doesn't
         # matter if it comes from different relations in a sample o from different samples in the
         # batch.
         x = B.permute(0, 2, 1).contiguous().view(-1, self.input_dim)
@@ -69,7 +69,6 @@ class ObjectModel(nn.Module):
         Returns:
             [batch_size * n_objects, 2] speedX and speedY
         """
-        # input_size = x.size(2)
         batch_size, _, n_objects = C.shape
 
         x = C.permute(0, 2, 1).contiguous().view(-1, self.input_dim)
@@ -138,13 +137,6 @@ class InteractionNetwork(nn.Module):
         assert self.D_s + self.D_x + self.D_e == C.shape[1]
         assert self.N_O == C.shape[2]
 
-        # print('O.shape', O.shape)
-        # print('x', X.shape)
-        # print('B.shape', B.shape)
-        # print('E.shape', E.shape)
-        # print('C.shape', C.shape)
-        # print('predicted.shape', predicted.shape)
-
         return predicted
 
     def marshalling(self, O):
@@ -153,8 +145,6 @@ class InteractionNetwork(nn.Module):
         assert self.R_r.shape[0] == self.N_O
         assert O.shape[-1] == self.N_O
 
-        # print('O', O.shape, type(O), O.dtype)
-        # print('R_r', self.R_r.shape, type(self.R_r), self.R_r.dtype)
         O_R_r = O @ self.R_r
         O_R_s = O @ self.R_s
         B = torch.cat([O_R_r,
