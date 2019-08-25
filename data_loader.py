@@ -6,15 +6,19 @@ from physics_engine import VEL
 
 class DataLoader:
 
-    def __init__(self, data, batch_size, shuffle=True, device='cuda'):
+    def __init__(self, data, scaler, batch_size=256, shuffle=True, device='cuda'):
 
         if not isinstance(data, list):
             data = [data]
 
+        self.scaler = scaler
+
         self.data = [torch.from_numpy(sample).type(torch.float32).to(device) for sample in data]
         self.n_samples = sum([len(sample)-1 for sample in self.data])
+
         self.batch_size = batch_size if batch_size is not None else self.n_samples
         self.n_batches = int(np.ceil(self.n_samples / self.batch_size))
+
         self.n_states = self.data[0].shape[1]
         self.n_objects = self.data[0].shape[2]
         assert all([sample.shape[2] == self.n_objects for sample in self.data]), \

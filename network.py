@@ -83,16 +83,13 @@ class ObjectModel(nn.Module):
 # IN involves only matrix operations that do not contain learnable parameters.
 class InteractionNetwork(nn.Module):
 
-    def __init__(self, n_objects, state_dim, relation_dim, effect_dim, output_dim):
+    def __init__(self, state_dim, relation_dim, effect_dim, output_dim):
         super().__init__()
 
-        self.N_O = n_objects
         self.D_s = state_dim
         self.D_r = relation_dim
         self.D_e = effect_dim
         self.D_p = output_dim
-
-        self.N_R, self.R_r, self.R_s, self.R_a = self.generate_matrices(self.N_O)
 
         self.f_R = RelationalModel(input_dim=2 * self.D_s + self.D_r,
                                    effect_dim=self.D_e,
@@ -104,11 +101,13 @@ class InteractionNetwork(nn.Module):
 
         self.to(device)
 
-    def update_matrices(self, N_O):
-        self.N_O = N_O
+    def update_matrices(self, n_objects):
+        self.N_O = n_objects
         self.N_R, self.R_r, self.R_s, self.R_a = self.generate_matrices(self.N_O)
 
     def generate_matrices(self, N_O):
+        # This generation of matrices assumes a bilateral relation between each couple of objects.
+        # This is good for the "n objects" gravitational problem.
         N_R = N_O * (N_O - 1)
         R_r = torch.zeros((N_O, N_R), dtype=torch.float).to(device)
         R_s = torch.zeros((N_O, N_R), dtype=torch.float).to(device)

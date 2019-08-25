@@ -1,3 +1,5 @@
+import os
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -5,47 +7,86 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
+from pathlib import Path
 
 from network import InteractionNetwork
 from physics_engine import POS_X, POS_Y, VEL, POS, COLOR_LIST, MASS
 from pytorch_commons import device
 
 
+DEFAULT_FILE_NAME = 'interaction_network'
+
+
 class ModelTrainer:
 
-    def __init__(self, n_objects, state_dim, relation_dim, effect_dim, output_dim):
-        self.network = InteractionNetwork(n_objects, state_dim, relation_dim, effect_dim, output_dim)
+    def __init__(self, *args, **kwargs):
+
+        self.args, self.kwargs = args, kwargs
+        self.network = InteractionNetwork(*args, **kwargs)
 
         self.losses = []
-        self.n_objects = n_objects
-        self.relation_dim = relation_dim
 
         self.optimizer = optim.Adam(self.network.parameters())
         self.criterion = nn.MSELoss()
 
+        self.scaler = None
+
+    def save(self, file_path=None, time_stamped=True):
+        if file_path is None:
+            file_path = DEFAULT_FILE_NAME
+
+        file_path = Path(file_path).with_suffix('')
+
+        if time_stamped:
+            timestr = time.strftime("%Y_%m_%d-%H%M%S")
+            file_path = Path(str(file_path) + '_' + timestr)
+        print(f'Saving {file_path}')
+
+        torch.save({
+            'model_args': self.args,
+            'model_kwargs': self.kwargs,
+            'network_state_dict': self.network.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'losses': self.losses,
+            'scaler': self.scaler,  # Needed for inference.
+        }, file_path.with_suffix('.tar'))
+
+    @staticmethod
+    def load(file_path=None):
+        if file_path is None:
+            file_path = find_biggest_version(DEFAULT_FILE_NAME)
+
+        print(f'Loading {file_path}')
+
+        checkpoint = torch.load(file_path)
+        model = ModelTrainer(*checkpoint['model_args'], **checkpoint['model_kwargs'])
+        model.network.load_state_dict(checkpoint['network_state_dict'])
+        model.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        model.losses = checkpoint['losses']
+        model.scaler = checkpoint['scaler']
+
+        return model
+
     def train(self, n_epoch, data_loader):
+        self.scaler = data_loader.scaler
+
         new_n_objects = data_loader.n_objects
         self.network.update_matrices(new_n_objects)
+
+        self.network.train()
 
         print('Training ...')
         for epoch in range(n_epoch):
             for objects, targets in data_loader:
-                # objects, targets = get_batch(data_loader._data, data_loader.batch_size)
+
                 predicted = self.network(objects)
                 loss = self.criterion(predicted, targets)
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+
                 self.losses.append(np.sqrt(loss.item()))
-
-                # print(loss)
-                # print('predicted', predicted.shape)
-                # print('objects', objects.shape)
-                # print('target', targets.shape)
-                # print('objects', objects[:3, VEL, 0])
-                # # print('predicted', predicted[:3])
-                # print('target', targets[:3, :, 0])
-
 
             if epoch % (n_epoch/20) == 0:
                 plt.figure(figsize=(10, 5))
@@ -60,6 +101,8 @@ class ModelTrainer:
         n_steps = data_loader.batch_size
         n_objects = data_loader.n_objects
         self.network.update_matrices(n_objects)
+
+        self.network.eval()
 
         states, _ = data_loader[0]
 
@@ -99,3 +142,12 @@ class ModelTrainer:
         plt.legend()
 
         return next_states_hat
+
+
+def find_biggest_version(file_path, extension='.tar', pattern=''):
+    file_path = str(file_path)
+
+    file_paths = [f for f in os.listdir() if all([file_path in f,
+                                                  pattern in f,
+                                                  extension in f])]
+    return Path(max(file_paths))
