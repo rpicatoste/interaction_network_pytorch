@@ -47,7 +47,7 @@ class ModelTrainer:
             'model_kwargs': self.kwargs,
             'network_state_dict': self.network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'losses': self.losses,
+            'losses': np.array(self.losses, dtype=np.float32),
             'scaler': self.scaler,  # Needed for inference.
         }, file_path.with_suffix('.tar'))
 
@@ -62,7 +62,7 @@ class ModelTrainer:
         model = ModelTrainer(*checkpoint['model_args'], **checkpoint['model_kwargs'])
         model.network.load_state_dict(checkpoint['network_state_dict'])
         model.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        model.losses = checkpoint['losses']
+        model.losses = checkpoint['losses'].tolist()
         model.scaler = checkpoint['scaler']
 
         return model
@@ -86,9 +86,9 @@ class ModelTrainer:
                 loss.backward()
                 self.optimizer.step()
 
-                self.losses.append(np.sqrt(loss.item()))
+                self.losses.append(np.float32(loss.item()))
 
-            if epoch % (n_epoch/20) == 0:
+            if epoch % (n_epoch/5) == 0:
                 plt.figure(figsize=(10, 5))
                 plt.title('Epoch %s RMS Error %s' % (epoch, np.sqrt(np.mean(self.losses[-100:]))))
                 plt.plot(self.losses)
@@ -112,18 +112,15 @@ class ModelTrainer:
         prev_state = states[0:1]
 
         with torch.no_grad():
-            for step_i in range(n_steps-2):
-                # print('prev_state.shape', prev_state.shape)
-                # print('objects.shape', objects.shape)
+            for step_i in range(n_steps-1):
                 speed_hat = self.network(prev_state)
-                # print('speed_prediction.shape', speed_prediction.shape)
+
                 next_state = torch.zeros_like(prev_state).to(device)
                 next_state[0, MASS, :] = prev_state[0, MASS, :]
                 next_state[0, POS, :] = prev_state[0, POS, :] + speed_hat * dt
                 next_state[0, VEL, :] = speed_hat
 
                 next_states_hat[step_i] = next_state
-
                 prev_state = next_state
 
         plt.figure(figsize=(10, 10))

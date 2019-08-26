@@ -2,31 +2,35 @@ import numpy as np
 import torch
 
 from physics_engine import VEL
+from utils import listify
 
 
 class DataLoader:
 
-    def __init__(self, data, scaler, batch_size=256, shuffle=True, device='cuda'):
+    def __init__(self, original_data, scaler, batch_size=None, shuffle=True, device='cuda'):
 
-        if not isinstance(data, list):
-            data = [data]
+        original_data = listify(original_data)
 
         self.scaler = scaler
 
-        self.data = [torch.from_numpy(sample).type(torch.float32).to(device) for sample in data]
-        self.n_samples = sum([len(sample)-1 for sample in self.data])
+        self.original_data = original_data
+
+        self.scaled_data = [torch.from_numpy(scaler.transform(sample)).type(torch.float32).to(device)
+                            for sample in original_data]
+
+        self.n_samples = sum([len(sample) - 1 for sample in self.scaled_data])
 
         self.batch_size = batch_size if batch_size is not None else self.n_samples
         self.n_batches = int(np.ceil(self.n_samples / self.batch_size))
 
-        self.n_states = self.data[0].shape[1]
-        self.n_objects = self.data[0].shape[2]
-        assert all([sample.shape[2] == self.n_objects for sample in self.data]), \
+        self.n_states = self.scaled_data[0].shape[1]
+        self.n_objects = self.scaled_data[0].shape[2]
+        assert all([sample.shape[2] == self.n_objects for sample in self.scaled_data]), \
             "All samples must have the same number of objects."
 
         self.shuffle = shuffle
-        index_sample = np.arange(len(self.data))
-        index_per_sample = [np.arange(len(sample)-1) for sample in self.data]
+        index_sample = np.arange(len(self.scaled_data))
+        index_per_sample = [np.arange(len(sample)-1) for sample in self.scaled_data]
         self.indexes = np.zeros((self.n_samples, 2), dtype=np.int)
         end_prev = 0
         for idx in index_sample:
@@ -63,8 +67,8 @@ class DataLoader:
         indexes_y = indexes_X.copy()
         indexes_y[:, 1] = indexes_y[:, 1] + 1
 
-        X = torch.stack([self.data[idx_sample[0]][idx_sample[1]] for idx_sample in indexes_X], dim=0)
-        y = torch.stack([self.data[idx_sample[0]][idx_sample[1]] for idx_sample in indexes_y], dim=0)
+        X = torch.stack([self.scaled_data[idx_sample[0]][idx_sample[1]] for idx_sample in indexes_X], dim=0)
+        y = torch.stack([self.scaled_data[idx_sample[0]][idx_sample[1]] for idx_sample in indexes_y], dim=0)
         y = y[:, VEL]
 
         return X, y

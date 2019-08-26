@@ -16,10 +16,11 @@ V_Y = 4
 POS = [POS_X, POS_Y]
 VEL = [V_X, V_Y]
 
+STATE = [MASS] + POS + VEL
+
 MASS_POS = [MASS] + POS
 MECHANICS = POS + VEL
 
-STATE = [MASS] + MECHANICS
 OUTPUT = VEL
 
 N_FEATURES = len(STATE)
@@ -27,7 +28,23 @@ BODY_SHAPE = (N_FEATURES,)
 
 COLOR_LIST = ['r','b','g','k','y','m','c']
 
-def generate_data_with_simulator(n_objects, orbit, time_steps, dt):
+
+def generate_data_with_simulator(n_samples, n_objects, time_steps, dt, orbit=None):
+    data = []
+    for ii in range(n_samples):
+        if orbit is None:
+            sample_orbit = np.random.choice([True, False])
+        else:
+            sample_orbit = orbit
+
+        data.append(generate_a_sample_with_simulator(n_objects=n_objects,
+                                                     orbit=sample_orbit,
+                                                     time_steps=time_steps,
+                                                     dt=dt))
+
+    return data
+
+def generate_a_sample_with_simulator(n_objects, orbit, time_steps, dt):
     print(f'Generating data with {time_steps} time steps for {n_objects} objects (orbit: {orbit}).')
 
     data = np.zeros((time_steps, n_objects, N_FEATURES), dtype=float)
@@ -168,6 +185,29 @@ def make_video(data, filename):
 
     print(f'Video done.')
 
+
+def plot_sample(sample, sim_sample=None):
+
+    for body_i in range(sample.shape[2]):
+        modifier_idx = body_i % len(COLOR_LIST)
+
+        plt.plot(sample[:, POS_Y, body_i],
+                 sample[:, POS_X, body_i],
+                 COLOR_LIST[modifier_idx])
+        if sim_sample:
+            plt.plot(sim_sample[:, POS_Y, body_i],
+                     sim_sample[:, POS_X, body_i],
+                     COLOR_LIST[modifier_idx])
+
+    plt.grid()
+    plt.show()
+
 if __name__ == '__main__':
-    data = generate_data_with_simulator(n_objects=5, orbit=True, time_steps=30 * 2, dt=0.001)
-    make_video(data, "test.mp4")
+    data = generate_data_with_simulator(n_samples=1,
+                                        n_objects=5,
+                                        orbit=True,
+                                        time_steps=30 * 2,
+                                        dt=0.001)
+
+    plot_sample(data[0])
+    # make_video(data[0], "test.mp4")
